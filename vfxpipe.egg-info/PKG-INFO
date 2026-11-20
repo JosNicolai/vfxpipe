@@ -1,0 +1,11 @@
+Metadata-Version: 2.4
+Name: vfxpipe
+Version: 0.1.0
+Summary: Footage → camera track → splat → proxy mesh → lighting → roto → Blender scene
+Requires-Python: >=3.10
+Requires-Dist: fastapi>=0.110
+Requires-Dist: uvicorn>=0.29
+Requires-Dist: numpy>=1.26
+Requires-Dist: pillow>=10
+Provides-Extra: mesh
+Requires-Dist: open3d>=0.18; extra == "mesh"

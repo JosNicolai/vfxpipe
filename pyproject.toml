@@ -1,0 +1,22 @@
+[project]
+name = "vfxpipe"
+version = "0.1.0"
+description = "Footage → camera track → splat → proxy mesh → lighting → roto → Blender scene"
+requires-python = ">=3.10"
+dependencies = ["fastapi>=0.110", "uvicorn>=0.29", "numpy>=1.26", "pillow>=10"]
+
+[project.optional-dependencies]
+mesh = ["open3d>=0.18"]
+
+[project.scripts]
+vfxpipe = "vfxpipe.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["vfxpipe*"]
+
+[tool.setuptools.package-data]
+vfxpipe = ["web/*.html", "blender/*.py"]
