@@ -6,7 +6,7 @@ import re
 import subprocess
 from pathlib import Path
 
-from ..runner import Step, Context, register, StepError
+from ..runner import Step, Context, register, StepError, cloud_hint
 
 
 def probe(ffprobe: str | None, ffmpeg: str, video: str) -> dict:
@@ -20,6 +20,8 @@ def probe(ffprobe: str | None, ffmpeg: str, video: str) -> dict:
             out = subprocess.run(cmd, capture_output=True, text=True, check=True).stdout
         except FileNotFoundError:
             raise StepError(f"could not launch ffprobe at {ffprobe}")
+        except OSError as e:
+            raise StepError(f"could not launch ffprobe at {ffprobe}: {e}{cloud_hint(e)}")
         except subprocess.CalledProcessError as e:
             raise StepError(f"ffprobe could not read the footage: {e.stderr.strip()[-300:]}")
         s = json.loads(out)["streams"][0]
@@ -30,6 +32,8 @@ def probe(ffprobe: str | None, ffmpeg: str, video: str) -> dict:
         info = subprocess.run([ffmpeg, "-hide_banner", "-i", video], capture_output=True, text=True).stderr
     except FileNotFoundError:
         raise StepError(f"could not launch ffmpeg at {ffmpeg}")
+    except OSError as e:
+        raise StepError(f"could not launch ffmpeg at {ffmpeg}: {e}{cloud_hint(e)}")
     m = re.search(r"Video:.*?(\d{2,5})x(\d{2,5})", info)
     f = re.search(r"([\d.]+) fps", info)
     if not m:

@@ -35,6 +35,15 @@ class StepError(RuntimeError):
     pass
 
 
+def cloud_hint(e: OSError) -> str:
+    """WinError 389 / 396 = the file is an online-only OneDrive placeholder."""
+    if getattr(e, "winerror", None) in (389, 396, 426):
+        return ("\n  This file is an online-only OneDrive placeholder, so Windows cannot start it. Fix: right-click the "
+                "tool's folder in Explorer > 'Always keep on this device', or move the tools out of OneDrive "
+                "(setup-tools.ps1 does that for you), then run `python -m vfxpipe tools` to update the paths.")
+    return ""
+
+
 class Context:
     """What a running step gets: the project, a logger, a progress setter and a
     cancel flag."""
@@ -79,7 +88,7 @@ class Context:
         except FileNotFoundError:
             raise StepError(f"could not launch {cmd[0]} — check the path with:  python -m vfxpipe tools")
         except OSError as e:
-            raise StepError(f"could not launch {cmd[0]}: {e}")
+            raise StepError(f"could not launch {cmd[0]}: {e}{cloud_hint(e)}")
         assert proc.stdout is not None
         n_lines = 0
         for line in proc.stdout:

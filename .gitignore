@@ -1,2 +1,9 @@
 /.venv
-
+*.pyc
+/shots/
+/models/
+/tools/
+/tools.json
+/recent_shots.json
+*.egg-info/
+__pycache__/

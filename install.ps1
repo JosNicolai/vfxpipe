@@ -1,8 +1,10 @@
 # vfxpipe - Windows setup.  Run from the vfxpipe folder in PowerShell:
 #   Set-ExecutionPolicy -Scope Process Bypass
 #   .\install.ps1
-# Optional:  .\install.ps1 -Cpu     (torch without CUDA - roto runs on CPU)
-param([switch]$Cpu)
+# Optional:  .\install.ps1 -Cpu            (torch without CUDA - roto runs on CPU)
+#            .\install.ps1 -Cuda cu128     (force a CUDA build: cu118, cu126 or cu128)
+# By default the CUDA build is chosen from your GPU (nvidia-smi).
+param([switch]$Cpu, [string]$Cuda = "")
 
 $ErrorActionPreference = "Stop"
 
@@ -27,6 +29,11 @@ if (-not $py) {
 }
 Write-Host "Using Python: $(& $py[0] $py[1..($py.Length)] -c 'import sys; print(sys.executable)')"
 
+if ((Get-Location).Path -match "OneDrive") {
+  Write-Host "WARNING: this folder is inside OneDrive. The .venv has thousands of small files and OneDrive can turn them"
+  Write-Host "         into online-only placeholders, which breaks Python and the tools. Moving the project to e.g. C:\vfxpipe is safer."
+}
+
 # --- venv -------------------------------------------------------------------------
 if (Test-Path .venv) {
   if (-not (Test-Path .venv\Scripts\python.exe)) { Remove-Item -Recurse -Force .venv }   # half-made venv from a failed run
@@ -39,23 +46,35 @@ python -m pip install --upgrade pip wheel
 pip install -e .
 pip install open3d
 
-# 2. torch - CUDA 12.x build for the 3060 Ti, or CPU
+# 2. torch - pick the CUDA build that matches the GPU
+if (-not $Cpu -and -not $Cuda) {
+  $cap = $null
+  try { $cap = (& nvidia-smi --query-gpu=name,compute_cap --format=csv,noheader 2>$null | Select-Object -First 1) } catch {}
+  if ($cap) {
+    Write-Host "GPU: $cap"
+    $ver = [double](($cap -split ",")[1].Trim())
+    if ($ver -ge 12.0) { $Cuda = "cu128" }        # RTX 50-series (Blackwell) needs CUDA 12.8 builds
+    else { $Cuda = "cu126" }                       # GTX 10 / RTX 20 / 30 / 40
+  } else {
+    Write-Host "No NVIDIA GPU / nvidia-smi found - installing CPU torch (roto will be slower)."
+    $Cpu = $true
+  }
+}
 if ($Cpu) {
   pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
 } else {
-  pip install torch torchvision --index-url https://download.pytorch.org/whl/cu124
+  Write-Host "Installing torch for $Cuda"
+  pip install torch torchvision --index-url "https://download.pytorch.org/whl/$Cuda"
 }
+python -c "import torch; print('torch', torch.__version__, '| CUDA available:', torch.cuda.is_available(), '|', torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'cpu')"
 
 # 3. SAM 2 (roto)
 $env:SAM2_BUILD_CUDA = "0"   # optional CUDA extension is not needed
 pip install "git+https://github.com/facebookresearch/sam2.git"
 
 Write-Host ""
-Write-Host "Python side done. External tools (all free) - use existing installs or unzip anywhere, then run:  python -m vfxpipe tools --colmap ... --brush ..."
-Write-Host "  ffmpeg      https://www.gyan.dev/ffmpeg/builds/          (add bin\ to PATH)"
-Write-Host "  COLMAP      https://github.com/colmap/colmap/releases    (colmap.bat / colmap.exe, CUDA build)"
-Write-Host "  GLOMAP      https://github.com/colmap/glomap/releases    (glomap.exe)"
-Write-Host "  Brush       https://github.com/ArthurBrussee/brush/releases     (brush-app-x86_64-pc-windows-msvc.zip)"
-Write-Host "  Blender     https://www.blender.org/download/            (4.2 LTS or newer; an existing install is found automatically)"
+Write-Host "Python side done. Next: install the external tools (ffmpeg, COLMAP, GLOMAP, Brush) automatically with:"
+Write-Host "    .\setup-tools.ps1"
+Write-Host "Blender 4.2 LTS or newer is not installed by this; an existing install is found automatically."
 Write-Host ""
-Write-Host "Start:   run.bat D:\shots\shot01 D:\footage\take03.mp4"
+Write-Host "Start:   .\run.bat"
